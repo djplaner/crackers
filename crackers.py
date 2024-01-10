@@ -36,9 +36,13 @@ Game will progress through the following stages
 
 import streamlit as st 
 
-import pandas as pd
+st.set_page_config(
+    page_title="Play Crackers",
+    page_icon=":tada:"
+)
 
-#from crackers import generateCrackersNumbers
+#-- help me debug my understanding of program execution in Streamlit
+DEBUG = False
 
 placeholder = st.empty()
 
@@ -70,8 +74,9 @@ def convertNumbersToMarkdown( numbers : list ) -> str :
     Given a list of numbers convert them to a markdown table with 8 columns
     and return a string with that markdown
 
-    Kludge
-
+    TODO
+    - Come up with a more responsive way to do this - flexbox?
+        Appears to be some inherent limitations in Streamlit
     """
 
     markdown = """
@@ -90,9 +95,31 @@ def convertNumbersToMarkdown( numbers : list ) -> str :
 
     return markdown
     
+def changeMaxN():
+    """
+    Called when the selectbox in the welcome page is changed. The select box will have set 
+    the st.session_state['maxN'] variable = what 2**maxN-1 should be..reverse that
+    """
+
+    if DEBUG:
+        st.write(f"changeMaxN --- before maxN: {st.session_state['maxN']} type {type(st.session_state['maxN'])}")
+        st.write(f"changeMaxN --- before upperLimit: {st.session_state['upperLimit']} type {type(st.session_state['upperLimit'])}")
+    
+    #-- User has selected a new upper limit. Update maxN accordingly
+    if st.session_state['upperLimit'] != 2**st.session_state['maxN']-1 and st.session_state['upperLimit'] != 0:
+        st.session_state['maxN'] = st.session_state['upperLimit'].bit_length()
+
+    #-- the user's used the about page and upper limit is screwed
+    #   Shift back to match maxN
+    if st.session_state['upperLimit'] == 0:
+        st.session_state['upperLimit'] = 2**st.session_state['maxN']-1
+
 
 #-------------------
 # Define the game stage pages
+# - welcome
+# - isYourNumberHere
+# - isThisYourNumber
 
 def welcome():
     """
@@ -100,31 +127,83 @@ def welcome():
     """
     st.title("Can I read your mind??!!! Let's see...")
 
-    st.markdown("""
-1. Pick any number between 1 and 63 - but don't tell me!!!
-2. Answer 6 simple questions.
-3. I will read your mind and tell you what number you picked. 
+    st.markdown(f"""
+1. Pick a number
+
+    Pick any number between :red[1] and :red[{2**st.session_state['maxN']-1}] - :shushing_face::shushing_face: but don't tell me!!!
+
+    (:information_source: Change the upper limit below)
+2. Answer _Is your number below?_ {(2**st.session_state['maxN']-1).bit_length()} times.
+
+    Each time you'll be shown a different list of numbers.
+3. :tada::tada: I will tell you your number
 """)
 
     st.button("Start!!", on_click=nextStage)
 
-def nextStage(numPresent: bool = False):
+    #-- set index to the index of the current 2**maxN-1 value
+    theOptions = [ 15, 31, 63, 127]
+    if DEBUG:
+        st.write(f"maxN: {st.session_state['maxN']} becomes {2**st.session_state['maxN']-1}")
+
+    if DEBUG:
+        st.write(f" 63 index: {theOptions.index(63)}")
+        st.write(f"type maxN {type(st.session_state['maxN'])} ")
+
+    optionIndex = theOptions.index( 2**st.session_state['maxN']-1 )
+
+
+    if DEBUG:
+        st.write(f"for maxN == {st.session_state['maxN']} becoming {2**st.session_state['maxN']-1} is found at index optionIndex: {optionIndex} i.e. {theOptions[optionIndex]}")
+
+    st.subheader("Change the upper limit on the range")
+
+    #-- kludge to make the selectbox not spread across the whole page
+    col1, col2 = st.columns(2)
+    col1.selectbox(
+        "Choose from 1 to...", options=(15, 31, 63, 127), 
+        index=optionIndex, key="upperLimit", label_visibility="visible"
+        )
+
+def nextStage():
     """
-    Move onto the next stage.
-    
-    If numPresent that means the gameStage represents a value of n where 2^(n-1) is one of the numbers that adds up to the number the user is thinking of.
+    Called when the user answers NO to _isYourNumberHere_ 
+
+    Moves onto the next game stage and clears the page
     """
+
+    if DEBUG:
+        st.write(f"nextStage --- before gameStage: {st.session_state['gameStage']} type {type(st.session_state['gameStage'])}")
+        st.write(f"nextStage --- before myGuess: {st.session_state['myGuess']} type {type(st.session_state['myGuess'])}")
+        st.write(f"maxN: {st.session_state['maxN']} type {type(st.session_state['maxN'])}")
+
     st.session_state['gameStage'] += 1
 
     placeholder.empty()
     
 def nextStageAddition():
+    """
+    Called when the user answers YES to _isYourNumberHere_
+
+    Updates myGuess with the appropriate number and moves onto the next game stage
+    """
+
+    if DEBUG:
+        st.write(f"nextStageAddition --- before gameStage: {st.session_state['gameStage']} type {type(st.session_state['gameStage'])}")
+        st.write(f"nextStageAddition --- before myGuess: {st.session_state['myGuess']} type {type(st.session_state['myGuess'])}")
+        st.write(f"maxN: {st.session_state['maxN']} type {type(st.session_state['maxN'])}")
 
     st.session_state['myGuess'] += 2**(st.session_state['gameStage'] - 1)
     st.session_state['gameStage'] += 1
     placeholder.empty()
 
 def isYourNumberHere():
+    """
+    Based on gameStage display a table/list of appropriate numbers and ask the user if they see their number.
+
+    Call nextStageAddition if the user answers YES
+    Call nextStage if the user answers NO
+    """
     st.title("Is your number in the table below?")
 
     col1, col2, col3 = st.columns(3)
@@ -145,35 +224,59 @@ def isYourNumberHere():
     st.markdown( numbersMarkdown )
 
 def startAgain():
-    for name in 'gameStage', 'maxN':
-        del st.session_state[name]
+    """
+    On the last stage, the user wishes to start again
+
+    Reset game stage
+    """
+    st.session_state['gameStage'] = 0
 
 def isThisYourNumber():
-    st.title(f"Is {st.session_state['myGuess']} your number?")
+    """ 
+    Present the user with their number and ask if they want to play again
+    """
+    st.title(f":tada::tada: You picked {st.session_state['myGuess']}!!!")
 
     st.button("Start again", on_click=startAgain)
 
-#-- Set up the variables
+#----------------------------
+# Main execution loop
+#
+# - curate the session state and associated variables
+# - decide which of the game stage functions to call
 
-if 'gameStage' not in st.session_state:
-    st.session_state['gameStage'] = 0
 
-if 'myGuess' not in st.session_state:
-    st.session_state['myGuess'] = 0
+#-- Set up session state 
+
+for var in 'gameStage', 'myGuess', 'upperLimit':
+    if var not in st.session_state:
+        st.session_state[var] = 0
 
 if 'maxN' not in st.session_state:
     st.session_state['maxN'] = 6
+    st.session_state['upperLimit'] = 63
 
 gameStageFunctions = [
     welcome, isYourNumberHere, isThisYourNumber
 ]
 
+if DEBUG:
+    st.write(f"starting the main loop with {st.session_state['gameStage']} and maxN {st.session_state['maxN']} upperLimit {st.session_state['upperLimit']}")
+
+changeMaxN()
+
+#-- Call the appropriate game stage function
+
 if st.session_state['gameStage'] == 0:
     st.session_state['myGuess'] = 0
     welcome()
 elif st.session_state['gameStage'] <= st.session_state['maxN']:
+    if DEBUG:
+        st.write("-------- insert your number here")
     isYourNumberHere()
 elif st.session_state['gameStage'] > st.session_state['maxN']:
+    if DEBUG:
+        st.write("-------- insert is this your number")
     isThisYourNumber()
 
 
