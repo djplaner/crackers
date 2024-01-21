@@ -1,6 +1,8 @@
 
 As described by Cathy Williams on YouCubed's [Crackers page](https://www.youcubed.org/tasks/crackers/), Crackers is the name of a [low floor, high ceiling](https://djplaner.github.io/memex/sense/Teaching/low-floor-high-ceiling-wide-walls/) mathematics learning task which is based on a prize from a Cracker Jack box. 
 
+[Play crackers](https://crackers.streamlit.app/)
+
 ## The game
 
 Given 6 specifically designed cards all full of numbers (between 1 and 63) you
